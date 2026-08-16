@@ -1,0 +1,12 @@
+@import "bootstrap/scss/bootstrap.scss";
+
+html,
+body,
+#root {
+    min-height: 100%;
+}
+
+body {
+    margin: 0;
+    background: #f5f6f8;
+}
