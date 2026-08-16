@@ -1,3 +1,5 @@
+import { SitesPage } from "../features/sites/pages/SitesPage";
+
 function App() {
     return (
         <>
@@ -8,19 +10,38 @@ function App() {
           </span>
 
                     <div className="navbar-nav">
-                        <a className="nav-link active" href="#">
+                        <a
+                            className="nav-link"
+                            href="#"
+                        >
                             Dashboard
                         </a>
 
-                        <a className="nav-link" href="#">
+                        <a
+                            className="nav-link active"
+                            href="#"
+                        >
+                            Sites
+                        </a>
+
+                        <a
+                            className="nav-link"
+                            href="#"
+                        >
                             Map
                         </a>
 
-                        <a className="nav-link" href="#">
+                        <a
+                            className="nav-link"
+                            href="#"
+                        >
                             Imports
                         </a>
 
-                        <a className="nav-link" href="#">
+                        <a
+                            className="nav-link"
+                            href="#"
+                        >
                             Performance
                         </a>
                     </div>
@@ -28,63 +49,9 @@ function App() {
             </nav>
 
             <main className="container-fluid py-4">
-                <div className="mb-4">
-                    <h1 className="h3 mb-1">Operations Dashboard</h1>
-
-                    <p className="text-body-secondary mb-0">
-                        Monitor and analyze geospatial infrastructure.
-                    </p>
-                </div>
-
-                <div className="row g-3">
-                    <MetricCard
-                        title="Total sites"
-                        value="100,000"
-                    />
-
-                    <MetricCard
-                        title="Online"
-                        value="82,341"
-                    />
-
-                    <MetricCard
-                        title="Offline"
-                        value="1,203"
-                    />
-
-                    <MetricCard
-                        title="Alerts"
-                        value="87"
-                    />
-                </div>
+                <SitesPage />
             </main>
         </>
-    );
-}
-
-interface MetricCardProps {
-    title: string;
-    value: string;
-}
-
-function MetricCard({
-                        title,
-                        value,
-                    }: MetricCardProps) {
-    return (
-        <div className="col-12 col-sm-6 col-xl-3">
-            <div className="card h-100">
-                <div className="card-body">
-                    <div className="text-body-secondary small">
-                        {title}
-                    </div>
-
-                    <div className="fs-3 fw-semibold">
-                        {value}
-                    </div>
-                </div>
-            </div>
-        </div>
     );
 }
 
