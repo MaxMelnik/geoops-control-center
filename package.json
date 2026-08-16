@@ -1,4 +1,14 @@
 {
+  "name": "geoops-control-center",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev --workspace=apps/web",
+    "build:web": "npm run build --workspace=apps/web"
+  },
   "dependencies": {
     "bootstrap": "^5.3.8"
   },
