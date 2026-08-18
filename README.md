@@ -149,14 +149,15 @@ rendering only the rows currently visible inside the viewport.
 
 The results will be compared against the naive implementation.
 
-Metric                                       Naive   Virtualized
-  -------------------- ----------------------------- -------------
-Dataset size                               100,000       100,000
-Rendered rows                              100,000           TBD
-Approx. DOM nodes                         800,000+           TBD
-UI responsiveness      Browser became unresponsive           TBD
-Render performance                             TBD           TBD
+Here is the properly formatted Markdown table:
 
+| Metric | Naive | Virtualized |
+| --- | --- | --- |
+| **Dataset size** | 100,000 | 100,000 |
+| **Rendered rows** | 100,000 | TBD |
+| **Approx. DOM nodes** | 800,000+ | TBD |
+| **UI responsiveness** | Browser became unresponsive | TBD |
+| **Render performance** | TBD | TBD |
 Actual performance measurements will be added after the virtualized
 implementation is completed.
 
