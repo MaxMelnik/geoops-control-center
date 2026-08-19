@@ -24,7 +24,7 @@ export function SitesTable({
             <div
                 className="table-responsive"
                 style={{
-                    maxHeight: "600px",
+                    maxHeight: "400px",
                     overflow: "auto",
                 }}
             >

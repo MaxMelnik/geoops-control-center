@@ -58,7 +58,7 @@ export function VirtualizedSitesTable({
                 <div
                     ref={parentRef}
                     style={{
-                        height: "600px",
+                        height: "400px",
                         overflow: "auto",
                     }}
                 >
