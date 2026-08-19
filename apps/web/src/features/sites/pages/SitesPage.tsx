@@ -1,9 +1,10 @@
 import { useMemo } from "react";
 
-import { SitesTable } from "../components/SitesTable";
 import { generateSites } from "../data/generateSites";
+import { VirtualizedSitesTable } from "../components/VirtualizedSitesTable";
+// import {SitesTable} from "../components/SitesTable.tsx";
 
-const SITE_COUNT = 100_000;
+const SITE_COUNT = 100;
 
 export function SitesPage() {
     const sites = useMemo(
@@ -23,7 +24,9 @@ export function SitesPage() {
                 </p>
             </div>
 
-            <SitesTable sites={sites} />
+            <VirtualizedSitesTable
+                sites={sites}
+            />
         </div>
     );
 }

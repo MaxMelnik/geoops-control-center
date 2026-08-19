@@ -3,10 +3,43 @@
 html,
 body,
 #root {
-    min-height: 100%;
+  min-height: 100%;
 }
 
 body {
-    margin: 0;
-    background: #f5f6f8;
+  margin: 0;
+  background: #f5f6f8;
+}
+
+.virtual-table-header,
+.virtual-table-row {
+  display: grid;
+  grid-template-columns:
+    140px
+    minmax(180px, 1.5fr)
+    minmax(120px, 1fr)
+    140px
+    120px
+    130px
+    130px;
+  align-items: center;
+  min-width: 1000px;
+}
+
+.virtual-table-header {
+  min-height: 45px;
+  padding: 0 12px;
+  background: var(--bs-tertiary-bg);
+  border-bottom: 1px solid var(--bs-border-color);
+  font-weight: 600;
+}
+
+.virtual-table-row {
+  padding: 0 12px;
+  border-bottom: 1px solid var(--bs-border-color);
+  background: var(--bs-body-bg);
+}
+
+.virtual-table-row:hover {
+  background: var(--bs-tertiary-bg);
 }
