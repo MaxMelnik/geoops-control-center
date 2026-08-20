@@ -1,13 +1,19 @@
-import { useRef } from "react";
+import {
+    useEffect,
+    useRef,
+} from "react";
 import {
     useVirtualizer,
     type VirtualItem,
 } from "@tanstack/react-virtual";
 
-import type { Site } from "../types/site";
+import type {Site} from "../types/site";
 
 interface VirtualizedSitesTableProps {
     sites: Site[];
+    onRenderedRowsChange?: (
+        count: number,
+    ) => void;
 }
 
 const ROW_HEIGHT = 45;
@@ -20,6 +26,7 @@ const STATUS_CLASSES: Record<Site["status"], string> = {
 
 export function VirtualizedSitesTable({
                                           sites,
+                                          onRenderedRowsChange,
                                       }: VirtualizedSitesTableProps) {
     const parentRef = useRef<HTMLDivElement>(null);
 
@@ -31,6 +38,15 @@ export function VirtualizedSitesTable({
     });
 
     const virtualRows = rowVirtualizer.getVirtualItems();
+
+    useEffect(() => {
+        onRenderedRowsChange?.(
+            virtualRows.length,
+        );
+    }, [
+        virtualRows.length,
+        onRenderedRowsChange,
+    ]);
 
     return (
         <div className="card">
