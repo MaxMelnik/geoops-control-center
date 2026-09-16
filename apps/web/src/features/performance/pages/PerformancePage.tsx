@@ -1,4 +1,5 @@
 import {
+    useEffect,
     useMemo,
     useRef,
     useState,
@@ -11,22 +12,46 @@ import {
     type RegionAggregation,
 } from "../utils/aggregateSites";
 
+import {
+    analyzeNearestSites,
+    type GeoAnalysisResult,
+} from "../utils/analyzeNearestSites";
+
 type ComputationMode =
     | "main-thread"
     | "worker";
 
-interface BenchmarkResult {
+type Workload =
+    | "aggregation"
+    | "geo-analysis";
+
+interface AggregationBenchmarkResult {
+    type: "aggregation";
     duration: number;
     result: RegionAggregation[];
 }
 
-const SITE_COUNT = 100_000;
+interface GeoBenchmarkResult {
+    type: "geo-analysis";
+    duration: number;
+    result: GeoAnalysisResult;
+}
+
+type BenchmarkResult =
+    | AggregationBenchmarkResult
+    | GeoBenchmarkResult;
+
+const AGGREGATION_SITE_COUNT = 100_000;
+const GEO_SITE_COUNT = 10_000;
 
 export function PerformancePage() {
     const [mode, setMode] =
         useState<ComputationMode>(
             "main-thread",
         );
+
+    const [workload, setWorkload] =
+        useState<Workload>("aggregation");
 
     const [benchmark, setBenchmark] =
         useState<BenchmarkResult | null>(
@@ -36,42 +61,108 @@ export function PerformancePage() {
     const [isRunning, setIsRunning] =
         useState(false);
 
+    const [heartbeat, setHeartbeat] =
+        useState(0);
+
     const workerRef =
         useRef<Worker | null>(null);
 
-    const sites = useMemo(
-        () => generateSites(SITE_COUNT),
+    const aggregationSites = useMemo(
+        () =>
+            generateSites(
+                AGGREGATION_SITE_COUNT,
+            ),
         [],
     );
 
-    function runMainThreadBenchmark() {
-        setIsRunning(true);
+    const geoSites = useMemo(
+        () => generateSites(GEO_SITE_COUNT),
+        [],
+    );
+
+    useEffect(() => {
+        const intervalId =
+            window.setInterval(() => {
+                setHeartbeat(
+                    (current) => current + 1,
+                );
+            }, 100);
+
+        return () => {
+            window.clearInterval(intervalId);
+        };
+    }, []);
+
+    useEffect(() => {
+        return () => {
+            workerRef.current?.terminate();
+        };
+    }, []);
+
+    function handleWorkloadChange(
+        nextWorkload: Workload,
+    ) {
+        setWorkload(nextWorkload);
         setBenchmark(null);
+    }
 
+    function handleModeChange(
+        nextMode: ComputationMode,
+    ) {
+        setMode(nextMode);
+        setBenchmark(null);
+    }
+
+    function runBenchmark() {
+        setBenchmark(null);
+        setIsRunning(true);
+
+        /*
+         * Allow React to render "Running..."
+         * before intentionally blocking the main thread.
+         */
         requestAnimationFrame(() => {
-            const startTime =
-                performance.now();
+            if (workload === "aggregation") {
+                if (mode === "main-thread") {
+                    runAggregationMainThread();
+                } else {
+                    runAggregationWorker();
+                }
 
-            const result =
-                aggregateSites(sites);
+                return;
+            }
 
-            const duration =
-                performance.now() -
-                startTime;
-
-            setBenchmark({
-                duration,
-                result,
-            });
-
-            setIsRunning(false);
+            if (mode === "main-thread") {
+                runGeoMainThread();
+            } else {
+                runGeoWorker();
+            }
         });
     }
 
-    function runWorkerBenchmark() {
-        setIsRunning(true);
-        setBenchmark(null);
+    function runAggregationMainThread() {
+        const startTime =
+            performance.now();
 
+        const result =
+            aggregateSites(
+                aggregationSites,
+            );
+
+        const duration =
+            performance.now() -
+            startTime;
+
+        setBenchmark({
+            type: "aggregation",
+            duration,
+            result,
+        });
+
+        setIsRunning(false);
+    }
+
+    function runAggregationWorker() {
         const worker = new Worker(
             new URL(
                 "../../../workers/siteAggregation.worker.ts",
@@ -85,9 +176,24 @@ export function PerformancePage() {
         workerRef.current = worker;
 
         worker.onmessage = (
-            event: MessageEvent<BenchmarkResult>,
+            event: MessageEvent<{
+                duration: number;
+                result: RegionAggregation[];
+            }>,
         ) => {
-            setBenchmark(event.data);
+            setBenchmark({
+                type: "aggregation",
+                duration: event.data.duration,
+                result: event.data.result,
+            });
+
+            setIsRunning(false);
+
+            worker.terminate();
+            workerRef.current = null;
+        };
+
+        worker.onerror = () => {
             setIsRunning(false);
 
             worker.terminate();
@@ -95,79 +201,200 @@ export function PerformancePage() {
         };
 
         worker.postMessage({
-            sites,
+            sites: aggregationSites,
         });
     }
 
-    function runBenchmark() {
-        if (mode === "main-thread") {
-            runMainThreadBenchmark();
-            return;
-        }
+    function runGeoMainThread() {
+        const startTime =
+            performance.now();
 
-        runWorkerBenchmark();
+        const result =
+            analyzeNearestSites(
+                geoSites,
+            );
+
+        const duration =
+            performance.now() -
+            startTime;
+
+        setBenchmark({
+            type: "geo-analysis",
+            duration,
+            result,
+        });
+
+        setIsRunning(false);
     }
+
+    function runGeoWorker() {
+        const worker = new Worker(
+            new URL(
+                "../../../workers/geoAnalysis.worker.ts",
+                import.meta.url,
+            ),
+            {
+                type: "module",
+            },
+        );
+
+        workerRef.current = worker;
+
+        worker.onmessage = (
+            event: MessageEvent<{
+                duration: number;
+                result: GeoAnalysisResult;
+            }>,
+        ) => {
+            setBenchmark({
+                type: "geo-analysis",
+                duration: event.data.duration,
+                result: event.data.result,
+            });
+
+            setIsRunning(false);
+
+            worker.terminate();
+            workerRef.current = null;
+        };
+
+        worker.onerror = () => {
+            setIsRunning(false);
+
+            worker.terminate();
+            workerRef.current = null;
+        };
+
+        worker.postMessage({
+            sites: geoSites,
+        });
+    }
+
+    const currentDatasetSize =
+        workload === "aggregation"
+            ? AGGREGATION_SITE_COUNT
+            : GEO_SITE_COUNT;
 
     return (
         <div>
             <div className="mb-4">
                 <h1 className="h3 mb-1">
-                    Performance
+                    Web Worker Performance Lab
                 </h1>
 
                 <p className="text-body-secondary mb-0">
-                    Compare heavy computation on the main
-                    thread and in a Web Worker.
+                    Compare CPU-bound work on the
+                    browser main thread and a Web Worker.
                 </p>
             </div>
 
             <div className="card mb-4">
                 <div className="card-body">
-                    <div className="fw-semibold mb-2">
-                        Computation mode
+                    <div className="row g-4">
+                        <div className="col-12 col-lg-6">
+                            <div className="fw-semibold mb-2">
+                                Workload
+                            </div>
+
+                            <div
+                                className="btn-group"
+                                role="group"
+                            >
+                                <button
+                                    type="button"
+                                    className={
+                                        workload ===
+                                        "aggregation"
+                                            ? "btn btn-primary"
+                                            : "btn btn-outline-primary"
+                                    }
+                                    disabled={isRunning}
+                                    onClick={() =>
+                                        handleWorkloadChange(
+                                            "aggregation",
+                                        )
+                                    }
+                                >
+                                    Light Aggregation
+                                </button>
+
+                                <button
+                                    type="button"
+                                    className={
+                                        workload ===
+                                        "geo-analysis"
+                                            ? "btn btn-primary"
+                                            : "btn btn-outline-primary"
+                                    }
+                                    disabled={isRunning}
+                                    onClick={() =>
+                                        handleWorkloadChange(
+                                            "geo-analysis",
+                                        )
+                                    }
+                                >
+                                    Heavy Geo Analysis
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="col-12 col-lg-6">
+                            <div className="fw-semibold mb-2">
+                                Execution
+                            </div>
+
+                            <div
+                                className="btn-group"
+                                role="group"
+                            >
+                                <button
+                                    type="button"
+                                    className={
+                                        mode === "main-thread"
+                                            ? "btn btn-primary"
+                                            : "btn btn-outline-primary"
+                                    }
+                                    disabled={isRunning}
+                                    onClick={() =>
+                                        handleModeChange(
+                                            "main-thread",
+                                        )
+                                    }
+                                >
+                                    Main Thread
+                                </button>
+
+                                <button
+                                    type="button"
+                                    className={
+                                        mode === "worker"
+                                            ? "btn btn-primary"
+                                            : "btn btn-outline-primary"
+                                    }
+                                    disabled={isRunning}
+                                    onClick={() =>
+                                        handleModeChange(
+                                            "worker",
+                                        )
+                                    }
+                                >
+                                    Web Worker
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
-                    <div
-                        className="btn-group mb-4"
-                        role="group"
-                    >
-                        <button
-                            type="button"
-                            className={
-                                mode === "main-thread"
-                                    ? "btn btn-primary"
-                                    : "btn btn-outline-primary"
-                            }
-                            onClick={() =>
-                                setMode("main-thread")
-                            }
-                        >
-                            Main Thread
-                        </button>
+                    <hr />
 
-                        <button
-                            type="button"
-                            className={
-                                mode === "worker"
-                                    ? "btn btn-primary"
-                                    : "btn btn-outline-primary"
-                            }
-                            onClick={() =>
-                                setMode("worker")
-                            }
-                        >
-                            Web Worker
-                        </button>
-                    </div>
-
-                    <div className="mb-4">
+                    <div className="mb-3">
                         <div className="fw-semibold">
-                            Task
+                            Current task
                         </div>
 
                         <div className="text-body-secondary">
-                            Aggregate 100,000 sites by
-                            region and status.
+                            {workload === "aggregation"
+                                ? "Aggregate 100,000 sites by region and status."
+                                : "Find the nearest site for every site using brute-force geospatial distance calculations."}
                         </div>
                     </div>
 
@@ -187,91 +414,87 @@ export function PerformancePage() {
             <div className="row g-3 mb-4">
                 <MetricCard
                     title="Dataset"
-                    value={SITE_COUNT.toLocaleString()}
+                    value={
+                        currentDatasetSize.toLocaleString()
+                    }
+                    description="Sites processed"
                 />
 
                 <MetricCard
-                    title="Mode"
+                    title="Execution"
                     value={
                         mode === "main-thread"
                             ? "Main Thread"
                             : "Web Worker"
                     }
+                    description={
+                        mode === "main-thread"
+                            ? "Runs on UI thread"
+                            : "Runs off main thread"
+                    }
                 />
 
                 <MetricCard
-                    title="Duration"
+                    title="Computation"
                     value={
                         benchmark
                             ? `${benchmark.duration.toFixed(1)} ms`
                             : "—"
                     }
+                    description="Measured computation time"
                 />
 
                 <MetricCard
-                    title="Regions"
-                    value={
-                        benchmark
-                            ? benchmark.result.length.toString()
-                            : "—"
+                    title="UI heartbeat"
+                    value={heartbeat.toLocaleString()}
+                    description={
+                        isRunning &&
+                        mode === "main-thread"
+                            ? "May freeze during computation"
+                            : "Updates every 100 ms"
                     }
                 />
             </div>
 
-            {benchmark && (
-                <div className="card">
-                    <div className="card-header fw-semibold">
-                        Aggregation result
-                    </div>
-
-                    <div className="table-responsive">
-                        <table className="table mb-0">
-                            <thead>
-                            <tr>
-                                <th>Region</th>
-                                <th>Total</th>
-                                <th>Online</th>
-                                <th>Offline</th>
-                                <th>Maintenance</th>
-                                <th>Users</th>
-                            </tr>
-                            </thead>
-
-                            <tbody>
-                            {benchmark.result.map(
-                                (region) => (
-                                    <tr key={region.region}>
-                                        <td>
-                                            {region.region}
-                                        </td>
-
-                                        <td>
-                                            {region.total.toLocaleString()}
-                                        </td>
-
-                                        <td>
-                                            {region.online.toLocaleString()}
-                                        </td>
-
-                                        <td>
-                                            {region.offline.toLocaleString()}
-                                        </td>
-
-                                        <td>
-                                            {region.maintenance.toLocaleString()}
-                                        </td>
-
-                                        <td>
-                                            {region.users.toLocaleString()}
-                                        </td>
-                                    </tr>
-                                ),
-                            )}
-                            </tbody>
-                        </table>
-                    </div>
+            <div
+                className={
+                    mode === "worker"
+                        ? "alert alert-success"
+                        : "alert alert-warning"
+                }
+            >
+                <div className="fw-semibold">
+                    Main thread responsiveness
                 </div>
-            )}
+
+                <div>
+                    Heartbeat:{" "}
+                    <strong>{heartbeat}</strong>
+                </div>
+
+                <div className="small mt-1">
+                    This counter is scheduled every
+                    100 ms. CPU-heavy work on the main
+                    thread prevents it from updating,
+                    while a Web Worker allows the UI
+                    thread to continue processing
+                    updates.
+                </div>
+            </div>
+
+            {benchmark?.type ===
+                "aggregation" && (
+                    <AggregationResults
+                        result={benchmark.result}
+                    />
+                )}
+
+            {benchmark?.type ===
+                "geo-analysis" && (
+                    <GeoResults
+                        result={benchmark.result}
+                    />
+                )}
         </div>
     );
 }
@@ -279,11 +502,13 @@ export function PerformancePage() {
 interface MetricCardProps {
     title: string;
     value: string;
+    description: string;
 }
 
 function MetricCard({
                         title,
                         value,
+                        description,
                     }: MetricCardProps) {
     return (
         <div className="col-12 col-sm-6 col-xl-3">
@@ -293,10 +518,133 @@ function MetricCard({
                         {title}
                     </div>
 
-                    <div className="fs-4 fw-semibold">
+                    <div className="fs-4 fw-semibold mb-1">
                         {value}
                     </div>
+
+                    <div className="text-body-secondary small">
+                        {description}
+                    </div>
                 </div>
+            </div>
+        </div>
+    );
+}
+
+function AggregationResults({
+                                result,
+                            }: {
+    result: RegionAggregation[];
+}) {
+    return (
+        <div className="card">
+            <div className="card-header fw-semibold">
+                Aggregation result
+            </div>
+
+            <div className="table-responsive">
+                <table className="table mb-0">
+                    <thead>
+                    <tr>
+                        <th>Region</th>
+                        <th>Total</th>
+                        <th>Online</th>
+                        <th>Offline</th>
+                        <th>Maintenance</th>
+                        <th>Users</th>
+                    </tr>
+                    </thead>
+
+                    <tbody>
+                    {result.map((region) => (
+                        <tr key={region.region}>
+                            <td>{region.region}</td>
+                            <td>
+                                {region.total.toLocaleString()}
+                            </td>
+                            <td>
+                                {region.online.toLocaleString()}
+                            </td>
+                            <td>
+                                {region.offline.toLocaleString()}
+                            </td>
+                            <td>
+                                {region.maintenance.toLocaleString()}
+                            </td>
+                            <td>
+                                {region.users.toLocaleString()}
+                            </td>
+                        </tr>
+                    ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+}
+
+function GeoResults({
+                        result,
+                    }: {
+    result: GeoAnalysisResult;
+}) {
+    return (
+        <div className="card">
+            <div className="card-header fw-semibold">
+                Geo analysis result
+            </div>
+
+            <div className="card-body">
+                <div className="row g-3">
+                    <ResultValue
+                        label="Processed sites"
+                        value={
+                            result.processedSites.toLocaleString()
+                        }
+                    />
+
+                    <ResultValue
+                        label="Distance comparisons"
+                        value={
+                            result.comparisons.toLocaleString()
+                        }
+                    />
+
+                    <ResultValue
+                        label="Average nearest distance"
+                        value={`${result.averageNearestDistanceKm.toFixed(3)} km`}
+                    />
+
+                    <ResultValue
+                        label="Minimum nearest distance"
+                        value={`${result.minNearestDistanceKm.toFixed(3)} km`}
+                    />
+
+                    <ResultValue
+                        label="Maximum nearest distance"
+                        value={`${result.maxNearestDistanceKm.toFixed(3)} km`}
+                    />
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function ResultValue({
+                         label,
+                         value,
+                     }: {
+    label: string;
+    value: string;
+}) {
+    return (
+        <div className="col-12 col-md-6 col-xl">
+            <div className="text-body-secondary small">
+                {label}
+            </div>
+
+            <div className="fw-semibold">
+                {value}
             </div>
         </div>
     );
