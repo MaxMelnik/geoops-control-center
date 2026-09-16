@@ -5,7 +5,7 @@ import {
     useState,
 } from "react";
 
-import { generateSites } from "../../sites/data/generateSites";
+import {generateSites} from "../../sites/data/generateSites";
 
 import {
     aggregateSites,
@@ -42,7 +42,7 @@ type BenchmarkResult =
     | GeoBenchmarkResult;
 
 const AGGREGATION_SITE_COUNT = 100_000;
-const GEO_SITE_COUNT = 10_000;
+const GEO_SITE_COUNT = 5_000;
 
 export function PerformancePage() {
     const [mode, setMode] =
@@ -384,7 +384,7 @@ export function PerformancePage() {
                         </div>
                     </div>
 
-                    <hr />
+                    <hr/>
 
                     <div className="mb-3">
                         <div className="fw-semibold">
@@ -445,41 +445,42 @@ export function PerformancePage() {
                 />
 
                 <MetricCard
-                    title="UI heartbeat"
-                    value={heartbeat.toLocaleString()}
+                    title="Workload"
+                    value={
+                        workload === "aggregation"
+                            ? "Light"
+                            : "Heavy"
+                    }
                     description={
-                        isRunning &&
-                        mode === "main-thread"
-                            ? "May freeze during computation"
-                            : "Updates every 100 ms"
+                        workload === "aggregation"
+                            ? "Region/status aggregation"
+                            : "O(n²) nearest-neighbour search"
                     }
                 />
             </div>
 
-            <div
-                className={
-                    mode === "worker"
-                        ? "alert alert-success"
-                        : "alert alert-warning"
-                }
-            >
-                <div className="fw-semibold">
-                    Main thread responsiveness
-                </div>
+            <ResponsivenessMonitor
+                heartbeat={heartbeat}
+                isRunning={isRunning}
+                mode={mode}
+            />
 
-                <div>
-                    Heartbeat:{" "}
-                    <strong>{heartbeat}</strong>
-                </div>
+            <div className="fw-semibold">
+                Main thread responsiveness
+            </div>
 
-                <div className="small mt-1">
-                    This counter is scheduled every
-                    100 ms. CPU-heavy work on the main
-                    thread prevents it from updating,
-                    while a Web Worker allows the UI
-                    thread to continue processing
-                    updates.
-                </div>
+            <div>
+                Heartbeat:{" "}
+                <strong>{heartbeat}</strong>
+            </div>
+
+            <div className="small mt-1">
+                This counter is scheduled every
+                100 ms. CPU-heavy work on the main
+                thread prevents it from updating,
+                while a Web Worker allows the UI
+                thread to continue processing
+                updates.
             </div>
 
             {benchmark?.type ===
@@ -495,6 +496,97 @@ export function PerformancePage() {
                         result={benchmark.result}
                     />
                 )}
+        </div>
+    );
+}
+
+interface ResponsivenessMonitorProps {
+    heartbeat: number;
+    isRunning: boolean;
+    mode: ComputationMode;
+}
+
+function ResponsivenessMonitor({
+                                   heartbeat,
+                                   isRunning,
+                                   mode,
+                               }: ResponsivenessMonitorProps) {
+    const progress = (heartbeat * 5) % 100;
+
+    return (
+        <div className="card mb-4">
+            <div className="card-header d-flex justify-content-between align-items-center">
+        <span className="fw-semibold">
+          UI Responsiveness Monitor
+        </span>
+
+                <span
+                    className={
+                        isRunning
+                            ? "badge text-bg-success"
+                            : "badge text-bg-secondary"
+                    }
+                >
+          {isRunning
+              ? "Benchmark running"
+              : "Idle"}
+        </span>
+            </div>
+
+            <div className="card-body">
+                <div className="d-flex justify-content-between mb-2">
+          <span>
+            Main thread heartbeat
+          </span>
+
+                    <span className="font-monospace">
+            #{heartbeat.toLocaleString()}
+          </span>
+                </div>
+
+                <div
+                    className="progress mb-3"
+                    role="progressbar"
+                    aria-label="UI heartbeat"
+                    aria-valuenow={progress}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                >
+                    <div
+                        className="progress-bar"
+                        style={{
+                            width: `${progress}%`,
+                        }}
+                    />
+                </div>
+
+                <div className="small text-body-secondary">
+                    {isRunning ? (
+                        mode === "main-thread" ? (
+                            <>
+                                Heavy computation is running on the{" "}
+                                <strong>main thread</strong>. If the
+                                workload is expensive enough, this
+                                heartbeat and the UI will temporarily
+                                freeze.
+                            </>
+                        ) : (
+                            <>
+                                Computation is running in a{" "}
+                                <strong>Web Worker</strong>. The heartbeat
+                                should continue updating because the main
+                                thread remains available.
+                            </>
+                        )
+                    ) : (
+                        <>
+                            The heartbeat updates every 100 ms. Run the
+                            same heavy workload using Main Thread and Web
+                            Worker to compare UI responsiveness.
+                        </>
+                    )}
+                </div>
+            </div>
         </div>
     );
 }
