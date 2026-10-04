@@ -1,25 +1,29 @@
 import {
     MapContainer,
-    Marker,
-    Popup,
     TileLayer,
 } from "react-leaflet";
 
 import type { Site } from "../../sites/types/site";
+import type { MarkerRenderingMode } from "../types/map";
+
+import { ClusteredSiteMarkers } from "./ClusteredSiteMarkers";
+import { IndividualSiteMarkers } from "./IndividualSiteMarkers";
 
 interface SiteMapProps {
     sites: Site[];
+    markerRenderingMode: MarkerRenderingMode;
 }
 
 const DEFAULT_CENTER: [number, number] = [
-    50.4501,
-    30.5234,
+    49.0,
+    31.0,
 ];
 
 const DEFAULT_ZOOM = 6;
 
 export function SiteMap({
                             sites,
+                            markerRenderingMode,
                         }: SiteMapProps) {
     return (
         <MapContainer
@@ -33,52 +37,11 @@ export function SiteMap({
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
 
-            {sites.map((site) => (
-                <Marker
-                    key={site.id}
-                    position={[
-                        site.location.lat,
-                        site.location.lng,
-                    ]}
-                >
-                    <Popup>
-                        <SitePopup site={site} />
-                    </Popup>
-                </Marker>
-            ))}
+            {markerRenderingMode === "individual" ? (
+                <IndividualSiteMarkers sites={sites} />
+            ) : (
+                <ClusteredSiteMarkers sites={sites} />
+            )}
         </MapContainer>
-    );
-}
-
-interface SitePopupProps {
-    site: Site;
-}
-
-function SitePopup({
-                       site,
-                   }: SitePopupProps) {
-    return (
-        <div>
-            <div className="fw-semibold">
-                {site.name}
-            </div>
-
-            <div>
-                Region: {site.region}
-            </div>
-
-            <div>
-                Status: {site.status}
-            </div>
-
-            <div>
-                Users: {site.users.toLocaleString()}
-            </div>
-
-            <div className="small text-body-secondary mt-1">
-                {site.location.lat.toFixed(5)},{" "}
-                {site.location.lng.toFixed(5)}
-            </div>
-        </div>
     );
 }

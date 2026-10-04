@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import {useMemo, useState} from "react";
 
-import { SiteMap } from "../components/SiteMap";
-import { generateSites } from "../../sites/data/generateSites";
+import {generateSites} from "../../sites/data/generateSites";
+import {SiteMap} from "../components/SiteMap";
+import type {MarkerRenderingMode} from "../types/map";
 
 type DatasetSize = 100 | 1_000 | 5_000;
 
@@ -14,6 +15,11 @@ const DATASET_OPTIONS: DatasetSize[] = [
 export function MapPage() {
     const [datasetSize, setDatasetSize] =
         useState<DatasetSize>(100);
+
+    const [
+        markerRenderingMode,
+        setMarkerRenderingMode,
+    ] = useState<MarkerRenderingMode>("individual");
 
     const sites = useMemo(
         () => generateSites(datasetSize),
@@ -36,30 +42,88 @@ export function MapPage() {
             <div className="card mb-4">
                 <div className="card-header">
           <span className="fw-semibold">
-            Map Dataset
+            Map Configuration
           </span>
                 </div>
 
                 <div className="card-body">
-                    <div className="d-flex flex-wrap gap-2">
-                        {DATASET_OPTIONS.map((size) => (
+                    <div className="mb-4">
+                        <div className="fw-semibold mb-2">
+                            Dataset size
+                        </div>
+
+                        <div className="d-flex flex-wrap gap-2">
+                            {DATASET_OPTIONS.map((size) => (
+                                <button
+                                    key={size}
+                                    type="button"
+                                    className={
+                                        datasetSize === size
+                                            ? "btn btn-primary"
+                                            : "btn btn-outline-primary"
+                                    }
+                                    onClick={() =>
+                                        setDatasetSize(size)
+                                    }
+                                >
+                                    {size.toLocaleString()}
+                                </button>
+                            ))}
+                        </div>
+
+                        <div className="small text-body-secondary mt-2">
+                            Number of synthetic infrastructure
+                            sites loaded into the map.
+                        </div>
+                    </div>
+
+                    <div>
+                        <div className="fw-semibold mb-2">
+                            Marker rendering
+                        </div>
+
+                        <div
+                            className="btn-group"
+                            role="group"
+                            aria-label="Marker rendering mode"
+                        >
                             <button
-                                key={size}
                                 type="button"
                                 className={
-                                    datasetSize === size
+                                    markerRenderingMode === "individual"
                                         ? "btn btn-primary"
                                         : "btn btn-outline-primary"
                                 }
-                                onClick={() => setDatasetSize(size)}
+                                onClick={() =>
+                                    setMarkerRenderingMode(
+                                        "individual",
+                                    )
+                                }
                             >
-                                {size.toLocaleString()}
+                                Individual
                             </button>
-                        ))}
-                    </div>
 
-                    <div className="small text-body-secondary mt-2">
-                        Sites rendered as individual Leaflet markers.
+                            <button
+                                type="button"
+                                className={
+                                    markerRenderingMode === "clustered"
+                                        ? "btn btn-primary"
+                                        : "btn btn-outline-primary"
+                                }
+                                onClick={() =>
+                                    setMarkerRenderingMode(
+                                        "clustered",
+                                    )
+                                }
+                            >
+                                Clustered
+                            </button>
+                        </div>
+
+                        <div className="small text-body-secondary mt-2">
+                            Compare individual Leaflet markers
+                            with spatial marker clustering.
+                        </div>
                     </div>
                 </div>
             </div>
@@ -70,13 +134,26 @@ export function MapPage() {
             Site Map
           </span>
 
-                    <span className="badge text-bg-secondary">
-            {sites.length.toLocaleString()} markers
-          </span>
+                    <div className="d-flex gap-2">
+            <span className="badge text-bg-secondary">
+              {sites.length.toLocaleString()} sites
+            </span>
+
+                        <span className="badge text-bg-secondary">
+              {markerRenderingMode === "individual"
+                  ? "Individual"
+                  : "Clustered"}
+            </span>
+                    </div>
                 </div>
 
                 <div className="card-body p-0">
-                    <SiteMap sites={sites} />
+                    <SiteMap
+                        sites={sites}
+                        markerRenderingMode={
+                            markerRenderingMode
+                        }
+                    />
                 </div>
             </div>
         </div>
